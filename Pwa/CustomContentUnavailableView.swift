@@ -8,11 +8,28 @@
 import SwiftUI
 
 struct CustomContentUnavailableView: View {
+    var  icon: String
+    var title: String
+    var descrption: String
+    
     var body: some View {
-        Text(/*@START_MENU_TOKEN@*/"Hello, World!"/*@END_MENU_TOKEN@*/)
+        ContentUnavailableView {
+            Image(systemName: icon)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 96)
+            Text(title)
+                .font(.title)
+        } description: {
+            Text(descrption)
+        }
+        .foregroundStyle(.tertiary)
     }
 }
 
 #Preview {
-    CustomContentUnavailableView()
+    CustomContentUnavailableView(
+        icon: "cat.circle",
+        title: "No Photo",
+        descrption: "Add a photo to get stared")
 }

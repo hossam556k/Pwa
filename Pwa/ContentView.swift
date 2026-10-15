@@ -6,83 +6,134 @@
 //
 
 import SwiftUI
-import CoreData
+import SwiftData
 
 struct ContentView: View {
-    @Environment(\.managedObjectContext) private var viewContext
-
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)],
-        animation: .default)
-    private var items: FetchedResults<Item>
-
+    
+    @Environment(\.modelContext) var modelContext
+    @Query private var pets: [Pet]
+    
+    @State private var path = [Pet]()
+    @State private var isEditing: Bool = false
+    
+    let layout = [
+        GridItem(.flexible(minimum: 120)),
+        GridItem(.flexible(minimum: 120))
+    ]
+    
+    func addPet() {
+        isEditing = false
+        let pet = Pet(name: "Best Friend")
+        modelContext.insert(pet)
+        path = [pet]
+    }
+    
     var body: some View {
-        NavigationView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp!, formatter: itemFormatter)")
-                    } label: {
-                        Text(item.timestamp!, formatter: itemFormatter)
+        NavigationStack(path: $path) {
+            ScrollView {
+                LazyVGrid(columns: layout) {
+                    ForEach(pets) { pet in
+                        
+                        NavigationLink(value: pet) {
+                            VStack {
+                                
+                                if let imageData = pet.photo {
+                                    if let image = UIImage(data: imageData) {
+                                        Image(uiImage: image)
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(maxWidth: .infinity)
+                                            .frame(height: 150)
+                                            .clipped()
+                                    }
+                                } else {
+                                    Image(systemName: "pawprint.circle")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .padding(40)
+                                        .foregroundStyle(.quaternary)
+                                }
+                                
+                                Spacer()
+                                
+                                Text(pet.name)
+                                    .font(.title.weight(.light))
+                                    .padding(.vertical)
+                                
+                                Spacer()
+                            }
+                            .frame(
+                                minWidth: 0,
+                                maxWidth: .infinity,
+                                minHeight: 200,
+                                maxHeight: .infinity
+                            )
+                            .background(.ultraThinMaterial)
+                            .clipShape(
+                                RoundedRectangle(
+                                    cornerRadius: 8,
+                                    style: .circular
+                                )
+                            )
+                            .overlay(alignment: .topTrailing) {
+                                if isEditing {
+                                    Menu {
+                                        Button("Delete", systemImage: "trash", role: .destructive) {
+                                            withAnimation {
+                                                modelContext.delete(pet)
+                                                try? modelContext.save()
+                                            }
+                                        }
+                                    } label: {
+                                        Image(systemName: "trash.circle.fill")
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(width: 36, height: 36)
+                                            .foregroundColor(.red)
+                                            .symbolRenderingMode(.multicolor)
+                                            .padding()
+                                    }
+                                }
+                            }
+                        }
+                        .foregroundStyle(.primary)
                     }
                 }
-                .onDelete(perform: deleteItems)
+                .padding(.horizontal)
             }
+            .navigationTitle(pets.isEmpty ? "" : "Paws")
+            .navigationDestination(for: Pet.self, destination: EditPetView.init)
             .toolbar {
-#if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        withAnimation {
+                            isEditing.toggle()
+                        }
+                    } label: {
+                        Image(systemName: "slider.horzional.3")
+                    }
                 }
-#endif
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Add a New Pet", systemImage: "plus.circle") {
+                        addPet()
                     }
                 }
             }
-            Text("Select an item")
-        }
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(context: viewContext)
-            newItem.timestamp = Date()
-
-            do {
-                try viewContext.save()
-            } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
-            }
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            offsets.map { items[$0] }.forEach(viewContext.delete)
-
-            do {
-                try viewContext.save()
-            } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
+            .overlay {
+                if pets.isEmpty {
+                    CustomContentUnavailableView(
+                        icon: "dog.circle",
+                        title: "No Pets",
+                        descrption: "Add a new pet to get started."
+                    )
+                }
             }
         }
     }
 }
 
-private let itemFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.dateStyle = .short
-    formatter.timeStyle = .medium
-    return formatter
-}()
-
-#Preview {
-    ContentView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+#Preview("Simple Data") {
+    ContentView()
+        .modelContainer(Pet.preview)
 }
+
